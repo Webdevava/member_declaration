@@ -1,101 +1,368 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React, { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Loader2, UserPlus, UserCog, AlertCircle, Users } from "lucide-react";
+import { useFamilyMembers } from "../hooks/useFamilyMembers";
+import { useGuests } from "../hooks/useGuests";
+import FamilyMemberCard from "@/components/FamilyMemberCard";
+import GuestListDialog from "@/components/GuestListDialog";
+import { useEditModeStore } from "@/store/editModeStore";
+
+export default function Page() {
+  const {
+    familyMembers,
+    loading: familyLoading,
+    fetchFamilyMembers,
+    addFamilyMember,
+    updateFamilyMember,
+    deleteFamilyMember,
+    toggleMemberActive,
+  } = useFamilyMembers();
+
+  const {
+    guests,
+    loading: guestLoading,
+    fetchGuests,
+    addGuest,
+    deleteGuest,
+  } = useGuests();
+
+  const [editingMember, setEditingMember] = useState(null);
+  const [newMember, setNewMember] = useState({
+    name: "",
+    age: "",
+    sex: "",
+  });
+  const [newGuest, setNewGuest] = useState({
+    age: 0,
+    sex: "",
+  });
+  const [dialogOpen, setDialogOpen] = useState({
+    addMember: false,
+    editMember: false,
+    guestList: false,
+  });
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    age: "",
+    sex: "",
+  });
+  const { isEditModeEnabled } = useEditModeStore();
+
+  useEffect(() => {
+    fetchFamilyMembers();
+    fetchGuests();
+  }, [fetchFamilyMembers, fetchGuests]);
+
+  const validateForm = () => {
+    const errors = {
+      name: !newMember.name ? "Name is required" : "",
+      age: !newMember.age
+        ? "Age is required"
+        : parseInt(newMember.age) < 0 || parseInt(newMember.age) > 120
+        ? "Age must be between 0 and 120"
+        : "",
+      sex: !newMember.sex ? "Sex is required" : "",
+    };
+
+    setFormErrors(errors);
+    return !Object.values(errors).some((error) => error !== "");
+  };
+
+  const handleAddMember = async () => {
+    if (!validateForm()) return;
+
+    try {
+      await addFamilyMember({
+        ...newMember,
+        age: parseInt(newMember.age),
+      });
+      setNewMember({ name: "", age: "", sex: "" });
+      setDialogOpen((prev) => ({ ...prev, addMember: false }));
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to add member");
+    }
+  };
+
+  const handleUpdateMember = async () => {
+    if (!validateForm()) return;
+    if (!editingMember) return;
+
+    try {
+      await updateFamilyMember(editingMember.id, {
+        ...newMember,
+        age: parseInt(newMember.age),
+      });
+      setNewMember({ name: "", age: "", sex: "" });
+      setEditingMember(null);
+      setDialogOpen((prev) => ({ ...prev, editMember: false }));
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to update member");
+    }
+  };
+
+  const handleAddGuest = async (e) => {
+    e.preventDefault();
+    try {
+      await addGuest(newGuest);
+      setNewGuest({ age: 0, sex: "" });
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to add guest");
+    }
+  };
+
+  const renderFamilyMemberCards = () => {
+    if (familyLoading.fetch) {
+      return (
+        <Card className="col-span-full flex items-center justify-center">
+          <Loader2 className="h-10 w-10 animate-spin" />
+        </Card>
+      );
+    }
+
+    const totalSlots = isEditModeEnabled ? 7 : familyMembers.length;
+    const membersWithEmptySlots = [
+      ...familyMembers,
+      ...Array(Math.max(0, totalSlots - familyMembers.length)).fill(null),
+    ];
+
+    return membersWithEmptySlots.map((member, index) => (
+      <FamilyMemberCard
+        key={member ? `member-${member.id}` : `empty-${index}`}
+        member={member || {}}
+        onToggleActive={toggleMemberActive}
+        onEdit={(member) => {
+          setEditingMember(member);
+          setNewMember({
+            name: member.name,
+            age: member.age.toString(),
+            sex: member.sex,
+          });
+          setDialogOpen((prev) => ({ ...prev, editMember: true }));
+        }}
+        onDelete={deleteFamilyMember}
+        onAdd={() => setDialogOpen((prev) => ({ ...prev, addMember: true }))}
+        loading={familyLoading}
+      />
+    ));
+  };
+
+  const renderMemberDialog = (isEditing) => {
+    const isLoading = isEditing ? familyLoading.update : familyLoading.add;
+    const dialogTitle = isEditing ? "Edit Family Member" : "Add Family Member";
+    const dialogDescription = isEditing
+      ? "Update details for existing family member"
+      : "Add a new member to your family";
+
+    return (
+      <Dialog
+        open={isEditing ? dialogOpen.editMember : dialogOpen.addMember}
+        onOpenChange={(open) =>
+          setDialogOpen((prev) => ({
+            ...prev,
+            [isEditing ? "editMember" : "addMember"]: open,
+          }))
+        }
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center">
+              {isEditing ? (
+                <UserCog className="h-6 w-6 mr-2 text-primary" />
+              ) : (
+                <UserPlus className="h-6 w-6 mr-2 text-primary" />
+              )}
+              {dialogTitle}
+            </DialogTitle>
+            <DialogDescription>{dialogDescription}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                type="text"
+                placeholder="Enter name"
+                value={newMember.name}
+                onChange={(e) =>
+                  setNewMember((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                className={formErrors.name ? "border-destructive" : ""}
+              />
+              {formErrors.name && (
+                <div className="text-destructive text-sm flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {formErrors.name}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="age">Age</Label>
+              <Input
+                id="age"
+                type="number"
+                placeholder="Enter age"
+                value={newMember.age}
+                onChange={(e) =>
+                  setNewMember((prev) => ({
+                    ...prev,
+                    age: e.target.value,
+                  }))
+                }
+                min={0}
+                max={120}
+                className={formErrors.age ? "border-destructive" : ""}
+              />
+              {formErrors.age && (
+                <div className="text-destructive text-sm flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {formErrors.age}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="sex">Sex</Label>
+              <Select
+                value={newMember.sex}
+                onValueChange={(value) =>
+                  setNewMember((prev) => ({ ...prev, sex: value }))
+                }
+              >
+                <SelectTrigger
+                  className={formErrors.sex ? "border-destructive" : ""}
+                >
+                  <SelectValue placeholder="Select sex" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="male">Male</SelectItem>
+                  <SelectItem value="female">Female</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              {formErrors.sex && (
+                <div className="text-destructive text-sm flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2" />
+                  {formErrors.sex}
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={isEditing ? handleUpdateMember : handleAddMember}
+              disabled={isLoading}
+              className="w-full"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditing ? "Updating..." : "Adding..."}
+                </>
+              ) : isEditing ? (
+                "Update Member"
+              ) : (
+                "Add Member"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  const getGridColumns = () => {
+    const memberCount = familyMembers.length;
+    if (isEditModeEnabled || memberCount >= 5) return 5;
+    if (memberCount === 4) return 4;
+    if (memberCount === 3) return 3;
+    return 2;
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div
+      className={`grid grid-cols-${getGridColumns()} auto-rows-fr  h-full w-full `}
+    >
+      {/* Clock Card - Always Static */}
+      <Card className="col-span-2 row-span-1 flex flex-col justify-center items-center p-4 shadow-inner bg-transparent border-none">
+        <h1 className="text-[12vh] font-extrabold font-mono mb-2 text-primary">
+          {new Date().toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </h1>
+        <p className="font-bold text-[3.5vh]">
+          {new Date().toLocaleDateString([], {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })}
+        </p>
+      </Card>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      {/* Family Member Cards */}
+      {renderFamilyMemberCards()}
+
+      {/* Guest List Card */}
+      {/* <Card
+        className="col-span-1 hover:bg-accent/50 transition-colors duration-300 cursor-pointer"
+        onClick={() => setDialogOpen((prev) => ({ ...prev, guestList: true }))}
+      >
+        <CardContent className="flex items-center justify-center h-full py-6">
+          <div className="text-center">
+            <Users className="h-10 w-10 mx-auto mb-2 text-primary" />
+            <div className="font-semibold flex items-center justify-center">
+              {guestLoading.fetch ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                `Guests (${guests.length}/5)`
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card> */}
+
+      <GuestListDialog
+        guests={guests}
+        loading={guestLoading}
+        onAddGuest={handleAddGuest}
+        onDeleteGuest={deleteGuest}
+        newGuest={newGuest}
+        setNewGuest={setNewGuest}
+        dialogOpen={dialogOpen.guestList}
+        setDialogOpen={(open) =>
+          setDialogOpen((prev) => ({ ...prev, guestList: open }))
+        }
+      />
+
+      {/* Add Member Dialog */}
+      {renderMemberDialog(false)}
+
+      {/* Edit Member Dialog */}
+      {renderMemberDialog(true)}
     </div>
   );
 }
