@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -19,12 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, UserPlus, UserCog, AlertCircle, Users } from "lucide-react";
+import { Loader2, UserPlus, UserCog, AlertCircle } from "lucide-react";
 import { useFamilyMembers } from "../hooks/useFamilyMembers";
 import { useGuests } from "../hooks/useGuests";
 import FamilyMemberCard from "@/components/FamilyMemberCard";
 import GuestListDialog from "@/components/GuestListDialog";
-import { useEditModeStore } from "@/store/editModeStore";
 
 export default function Page() {
   const {
@@ -65,7 +64,6 @@ export default function Page() {
     age: "",
     sex: "",
   });
-  const { isEditModeEnabled } = useEditModeStore();
 
   useEffect(() => {
     fetchFamilyMembers();
@@ -132,16 +130,15 @@ export default function Page() {
   const renderFamilyMemberCards = () => {
     if (familyLoading.fetch) {
       return (
-        <Card className="col-span-full flex items-center justify-center">
+        <Card className="col-span-1 flex items-center justify-center">
           <Loader2 className="h-10 w-10 animate-spin" />
         </Card>
       );
     }
 
-    const totalSlots = isEditModeEnabled ? 7 : familyMembers.length;
     const membersWithEmptySlots = [
       ...familyMembers,
-      ...Array(Math.max(0, totalSlots - familyMembers.length)).fill(null),
+      ...Array(7 - familyMembers.length).fill(null),
     ];
 
     return membersWithEmptySlots.map((member, index) => (
@@ -293,20 +290,10 @@ export default function Page() {
     );
   };
 
-  const getGridColumns = () => {
-    const memberCount = familyMembers.length;
-    if (isEditModeEnabled || memberCount >= 5) return 5;
-    if (memberCount === 4) return 4;
-    if (memberCount === 3) return 3;
-    return 2;
-  };
-
   return (
-    <div
-      className={`grid grid-cols-${getGridColumns()} auto-rows-fr  h-full w-full `}
-    >
+    <div className="grid grid-cols-5 auto-rows-fr h-full w-full">
       {/* Clock Card - Always Static */}
-      <Card className="col-span-2 row-span-1 flex flex-col justify-center items-center p-4 shadow-inner bg-transparent border-none">
+      <Card className="col-span-2 flex flex-col justify-center items-center p-4 shadow-inner bg-transparent border-none">
         <h1 className="text-[12vh] font-extrabold font-mono mb-2 text-primary">
           {new Date().toLocaleTimeString([], {
             hour: "2-digit",
@@ -327,24 +314,6 @@ export default function Page() {
       {renderFamilyMemberCards()}
 
       {/* Guest List Card */}
-      {/* <Card
-        className="col-span-1 hover:bg-accent/50 transition-colors duration-300 cursor-pointer"
-        onClick={() => setDialogOpen((prev) => ({ ...prev, guestList: true }))}
-      >
-        <CardContent className="flex items-center justify-center h-full py-6">
-          <div className="text-center">
-            <Users className="h-10 w-10 mx-auto mb-2 text-primary" />
-            <div className="font-semibold flex items-center justify-center">
-              {guestLoading.fetch ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : (
-                `Guests (${guests.length}/5)`
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card> */}
-
       <GuestListDialog
         guests={guests}
         loading={guestLoading}
