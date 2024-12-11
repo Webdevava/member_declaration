@@ -65,6 +65,35 @@ export default function Page() {
     sex: "",
   });
 
+  const [currentTime, setCurrentTime] = useState('');
+  const [currentDate, setCurrentDate] = useState('');
+
+  useEffect(() => {
+    // Update time and date only on the client-side
+    const updateDateTime = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }));
+      setCurrentDate(now.toLocaleDateString([], {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }));
+    };
+
+    // Initial update
+    updateDateTime();
+
+    // Update every minute
+    const intervalId = setInterval(updateDateTime, 60000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
+  }, []);
+
   useEffect(() => {
     fetchFamilyMembers();
     fetchGuests();
@@ -294,21 +323,13 @@ export default function Page() {
     <div className="grid grid-cols-5 auto-rows-fr h-full w-full">
       {/* Clock Card - Always Static */}
       <Card className="col-span-2 flex flex-col justify-center items-center p-4 shadow-inner bg-transparent border-none">
-        <h1 className="text-[12vh] font-extrabold font-mono mb-2 text-primary">
-          {new Date().toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </h1>
-        <p className="font-bold text-[3.5vh]">
-          {new Date().toLocaleDateString([], {
-            weekday: "long",
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
-      </Card>
+      <h1 className="text-[12vh] font-extrabold font-mono mb-2 text-primary">
+        {currentTime}
+      </h1>
+      <p className="font-bold text-[3.5vh]">
+        {currentDate}
+      </p>
+    </Card>
 
       {/* Family Member Cards */}
       {renderFamilyMemberCards()}

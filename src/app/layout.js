@@ -2,6 +2,7 @@ import "./globals.css";
 import Topbar from "@/components/topbar";
 import Footer from "@/components/footer";
 import PWASetup from "./pwa-setup";
+import { Toaster } from "@/components/ui/toaster";
 
 
 export const metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }) {
         <Topbar />
         <main className="flex-[20] flex items-center justify-center w-full">
           {children}
+        <Toaster/>
         </main>
         <Footer />
       </body>
